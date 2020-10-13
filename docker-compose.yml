@@ -1,0 +1,88 @@
+version: "3"
+services:
+    web:
+        build:
+            context: ./apache
+        ports:
+            - 80:80
+        networks:
+            nossarede:
+                ipv4_address: 10.10.10.10
+                aliases: 
+                    - web
+        # volumes:
+            # - .backup/dbdata.tar.bz2:./apache
+            # - ./apache/public-html:/apache
+            # - ./apache/public-html/public-html.html:/urs/local/apache2/front/public-html.html
+    
+    db:
+        image: postgres
+        environment:
+            - POSTGRES_PASSWORD=1
+            - POSTGRES_USER=postgres
+            - POSTGRES_DB=db
+        volumes:
+            - ./apache/dbdata:/var/lib/postgres
+        networks:
+            nossarede:
+                ipv4_address: 10.10.10.11
+                aliases: 
+                    - db
+    pgadmin:
+        image: dpage/pgadmin4
+        environment:
+            - PGADMIN_DEFAULT_EMAIL=fernandamaia1001@gmail.com
+            - PGADMIN_DEFAULT_PASSWORD=1
+        ports: 
+            - 5050:80
+        depends_on:
+            - db
+        networks:
+            nossarede:
+                ipv4_address: 10.10.10.12
+                aliases: 
+                    - pgadmin
+    tomcat:
+        build:
+            context: ./tomcat
+        networks:
+            nossarede:
+                ipv4_address: 10.10.10.13
+                aliases: 
+                    - tomcat
+    db-backup:
+        image: alpine    
+        tty: false
+        environment:
+          - TARGET=dbdata
+        volumes:
+          - ./backup:/backup
+          - ./apache/dbdata:/volume
+        #   - ./apache/public-html:/volume
+        command: sh -c "tar -cjf /backup/$${TARGET}.tar.bz2 -C /volume ./"
+        networks:
+            nossarede:
+                ipv4_address: 10.10.10.14
+                aliases: 
+                    - db-backup
+    db-restore:
+        image: alpine    
+        environment:
+          - SOURCE=dbdata
+        volumes:
+          - ./backup:/backup
+          - ./apache/dbdata:/volume
+        #   - ./apache/public-html:/volume
+        command: sh -c "rm -rf /volume/* /volume/..?* /volume/.[!.]* ; tar -C /volume/ -xjf /backup/$${SOURCE}.tar.bz2"
+        networks:
+            nossarede:
+                ipv4_address: 10.10.10.15
+                aliases: 
+                    - db-restore
+networks:
+    nossarede:
+        ipam: 
+            driver: default
+            config: 
+                - subnet: 10.10.10.0/24
+
